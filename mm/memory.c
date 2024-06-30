@@ -4379,6 +4379,8 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret = 0;
 
+	trace_android_vh_tune_fault_around_bytes(&fault_around_bytes);
+
 	/*
 	 * Let's call ->map_pages() first and use ->fault() as fallback
 	 * if page by the offset is not ready to be mapped (cold cache or
@@ -5558,6 +5560,10 @@ int follow_phys(struct vm_area_struct *vma,
 	if (follow_pte(vma->vm_mm, address, &ptep, &ptl))
 		goto out;
 	pte = *ptep;
+
+	/* Never return PFNs of anon folios in COW mappings. */
+	if (vm_normal_page(vma, address, pte))
+		goto unlock;
 
 	if ((flags & FOLL_WRITE) && !pte_write(pte))
 		goto unlock;
