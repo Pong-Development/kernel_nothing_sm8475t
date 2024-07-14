@@ -1052,12 +1052,21 @@ static const struct file_operations tfa98xx_dbgfs_fw_state_fops = {
 	.llseek = default_llseek,
 };
 
+#ifdef CONFIG_DEBUG_FS
 static const struct file_operations tfa98xx_dbgfs_rpc_fops = {
 	.owner = THIS_MODULE,
 	.open = simple_open,
 	.read = tfa98xx_dbgfs_rpc_read,
 	.write = tfa98xx_dbgfs_rpc_send,
 	.llseek = default_llseek,
+};
+#endif
+
+static const struct proc_ops tfa98xx_dbgfs_rpc_fops = {
+	.proc_open = simple_open,
+	.proc_read = tfa98xx_dbgfs_rpc_read,
+	.proc_write = tfa98xx_dbgfs_rpc_send,
+	.proc_lseek = default_llseek,
 };
 
 #ifdef TFA98xx_calibrate
