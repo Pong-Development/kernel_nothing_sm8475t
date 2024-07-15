@@ -1236,6 +1236,7 @@ struct wmi_debugfs_info wmi_debugfs_infos[NUM_DEBUG_INFOS] = {
 #endif
 };
 
+#ifdef CONFIG_DEBUG_FS
 /**
  * wmi_debugfs_create() - Create debug_fs entry for wmi logging.
  *
@@ -1326,6 +1327,7 @@ static QDF_STATUS wmi_debugfs_init(wmi_unified_t wmi_handle, uint32_t pdev_idx)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 /**
  * wmi_mgmt_cmd_record() - Wrapper function for mgmt command logging macro
@@ -1364,7 +1366,9 @@ void wmi_mgmt_cmd_record(wmi_unified_t wmi_handle, uint32_t cmd,
  *
  * Return: none
  */
+#ifdef CONFIG_DEBUG_FS
 static void wmi_debugfs_remove(wmi_unified_t wmi_handle) { }
+#endif
 void wmi_mgmt_cmd_record(wmi_unified_t wmi_handle, uint32_t cmd,
 			void *header, uint32_t vdev_id, uint32_t chanfreq) { }
 static inline void wmi_log_buffer_free(struct wmi_unified *wmi_handle) { }
@@ -3030,7 +3034,9 @@ static inline void wmi_interface_logging_init(struct wmi_unified *wmi_handle,
 {
 	if (QDF_STATUS_SUCCESS == wmi_log_init(wmi_handle)) {
 		qdf_spinlock_create(&wmi_handle->log_info.wmi_record_lock);
+#ifdef CONFIG_DEBUG_FS
 		wmi_debugfs_init(wmi_handle, pdev_idx);
+#endif
 	}
 }
 #else
@@ -3309,7 +3315,9 @@ void wmi_unified_detach(struct wmi_unified *wmi_handle)
 				soc->wmi_pdev[i]->wmi_rx_work_queue);
 			qdf_destroy_workqueue(0,
 				soc->wmi_pdev[i]->wmi_rx_work_queue);
+#ifdef CONFIG_DEBUG_FS				
 			wmi_debugfs_remove(soc->wmi_pdev[i]);
+#endif			
 			buf = qdf_nbuf_queue_remove(
 					&soc->wmi_pdev[i]->event_queue);
 			while (buf) {
