@@ -12,7 +12,6 @@
 #include "sde_color_processing.h"
 #include "sde_kms.h"
 #include "sde_crtc.h"
-#include "sde_plane.h"
 #include "sde_hw_dspp.h"
 #include "sde_hw_lm.h"
 #include "sde_ad4.h"
@@ -213,6 +212,7 @@ typedef int (*feature_wrapper)(struct sde_hw_dspp *hw_dspp,
 struct drm_msm_pcc save_pcc;
 bool pcc_enabled = false;
 bool skip_pcc = false;
+bool skipped_pcc = false;
 
 static struct sde_kms *get_kms(struct drm_crtc *crtc)
 {
@@ -1711,8 +1711,6 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 	struct sde_hw_cp_cfg hw_cfg;
 	struct sde_hw_mixer *hw_lm;
 	struct sde_hw_dspp *hw_dspp;
-	struct drm_crtc *drm_crtc = &sde_crtc->base;
-	struct sde_crtc_state *cstate = to_sde_crtc_state(drm_crtc->state);
 	struct drm_property_blob *blob;
 	struct drm_msm_pcc *pcc_cfg;
 	u32 num_mixers = sde_crtc->num_mixers;
@@ -1752,13 +1750,8 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 		blob = prop_node->blob_ptr;
 		pcc_cfg = blob->data;
 
-		if (pcc_cfg->r.c == 0 && pcc_cfg->g.c == 0 && pcc_cfg->b.c == 0) {
-			cstate->color_invert_on = false;
-			hw_cfg.payload = NULL;
-			hw_cfg.len = 0;
-		} else {
-			cstate->color_invert_on = true;
-
+		if (!(pcc_cfg->r.c == 0 && pcc_cfg->g.c == 0 && pcc_cfg->b.c == 0)) {
+			sde_crtc_state->color_invert_on = true;
 			if (hw_cfg.payload && (hw_cfg.len == sizeof(save_pcc))) {
 				memcpy(&save_pcc, hw_cfg.payload, hw_cfg.len);
 				pcc_enabled = true;
@@ -1767,12 +1760,16 @@ static void _sde_cp_crtc_commit_feature(struct sde_cp_node *prop_node,
 					hw_cfg.payload = NULL;
 					hw_cfg.len = 0;
 					skip_pcc = true;
+					skipped_pcc = true;
 				} else {
 					skip_pcc = false;
+					skipped_pcc = false;
 				}
 			} else {
 				pcc_enabled = false;
 			}
+		} else {
+			sde_crtc_state->color_invert_on = false;
 		}
 	}
 
@@ -2213,11 +2210,11 @@ void sde_cp_crtc_apply_properties(struct drm_crtc *crtc)
 	struct sde_crtc *sde_crtc = NULL;
 	bool set_dspp_flush = false, set_lm_flush = false;
 	struct sde_cp_node *prop_node = NULL, *n = NULL;
-	struct sde_crtc_state *cstate = to_sde_crtc_state(crtc->state);
 	struct sde_hw_ctl *ctl;
 	u32 num_mixers = 0, i = 0;
 	int rc = 0;
 	bool need_flush = false;
+	struct sde_crtc_state *cstate;
 	bool dirty_pcc = false;
 	bool disable_pending_cp = false;
 
@@ -2252,11 +2249,9 @@ void sde_cp_crtc_apply_properties(struct drm_crtc *crtc)
 	disable_pending_cp = sde_crtc->disable_pending_cp;
 	sde_crtc->disable_pending_cp = false;
 
-	if (cstate->color_invert_on) {
-		dirty_pcc = sde_cp_crtc_update_pcc(crtc);
-		if (dirty_pcc)
-			set_dspp_flush = true;
-	}
+	dirty_pcc = sde_cp_crtc_update_pcc(crtc);
+	if (dirty_pcc)
+		set_dspp_flush = true;
 
 	if (list_empty(&sde_crtc->cp_dirty_list) &&
 			list_empty(&sde_crtc->ad_dirty) &&
@@ -5084,23 +5079,3 @@ void sde_cp_set_skip_blend_plane_info(struct drm_crtc *drm_crtc,
 	mutex_unlock(&crtc->crtc_cp_lock);
 }
 
-const struct drm_msm_pcc *sde_cp_crtc_get_pcc_cfg(struct drm_crtc *drm_crtc)
-{
-	struct drm_property_blob *blob = NULL;
-	struct sde_cp_node *prop_node = NULL;
-	struct sde_crtc *crtc;
-
-	crtc = to_sde_crtc(drm_crtc);
-
-	mutex_lock(&crtc->crtc_cp_lock);
-	list_for_each_entry(prop_node, &crtc->cp_feature_list, cp_feature_list) {
-		if (prop_node->feature == SDE_CP_CRTC_DSPP_PCC) {
-			blob = prop_node->blob_ptr;
-			break;
-		}
-	}
-
-	mutex_unlock(&crtc->crtc_cp_lock);
-
-	return blob ? blob->data : NULL;
-}

@@ -974,6 +974,16 @@ static int _sde_connector_update_hdr_metadata(struct sde_connector *c_conn,
 	return rc;
 }
 
+static bool sde_connector_fod_dim_layer_status(struct sde_connector *c_conn)
+{
+	if (!c_conn->encoder || !c_conn->encoder->crtc ||
+	    !c_conn->encoder->crtc->state)
+		return false;
+
+	return (!!to_sde_crtc_state(c_conn->encoder->crtc->state)->fod_dim_layer &&
+		!!to_sde_crtc_state(c_conn->encoder->crtc->state)->fod_dim_valid);
+}
+
 static int _sde_connector_update_dirty_properties(
 				struct drm_connector *connector)
 {
@@ -1028,15 +1038,6 @@ static int _sde_connector_update_dirty_properties(
 	return 0;
 }
 
-static bool sde_connector_is_fod_enabled(struct sde_connector *c_conn)
-{
-	if (!c_conn->encoder || !c_conn->encoder->crtc ||
-	    !c_conn->encoder->crtc->state)
-		return false;
-
-	return !!to_sde_crtc_state(c_conn->encoder->crtc->state)->fod_dim_layer;
-}
-
 static int _sde_connector_update_finger_hbm_status(
 				struct drm_connector *connector)
 {
@@ -1060,14 +1061,17 @@ static int _sde_connector_update_finger_hbm_status(
 		return -EINVAL;
 	}
 
-        status = sde_connector_is_fod_enabled(c_conn);
-        if ((!c_conn->fingerlayer_dirty) && (status == dsi_panel_get_fod_ui(display->panel)))
+        status = sde_connector_fod_dim_layer_status(c_conn);
+        if ((!c_conn->fingerlayer_dirty) && (status == dsi_panel_get_fod_ui(display->panel))) 
                 return 0;
 
 	if (display->panel->power_mode == SDE_MODE_DPMS_OFF) {
 		SDE_ERROR("panel in power off\n");
 		return 0;
 	}
+
+	if (display->panel->bl_config.real_bl_level >= display->panel->bl_config.bl_hbm_level)
+	        return 0;
 
 	SDE_ATRACE_BEGIN("_sde_connector_update_finger_hbm_statuss");
         if (!c_conn->fingerlayer_dirty)
@@ -1083,6 +1087,8 @@ static int _sde_connector_update_finger_hbm_status(
 			mutex_unlock(&c_conn->lock);
 			c_conn->last_panel_power_mode = SDE_MODE_DPMS_ON;
 		}
+		if (!c_conn->fingerlayer_dirty)
+                        usleep_range(521 * 10, 521 * 10); // Avoid screen flashes
 		sde_backlight_device_update_status(c_conn->bl_device);
 		/*wait for VBLANK */
 		//sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
@@ -2603,7 +2609,7 @@ ssize_t nt_tx_cmd(struct sde_connector *c_conn, const char *buf, size_t count)
 	strncpy(input, buf, count);
 	input[count] = '\0';
 
-	SDE_INFO("Command requested for transfer to panel: %s\n", input);
+	SDE_DEBUG("Command requested for transfer to panel: %s\n", input);
 
 	input_copy = kstrdup(input, GFP_KERNEL);
 	if (!input_copy) {
