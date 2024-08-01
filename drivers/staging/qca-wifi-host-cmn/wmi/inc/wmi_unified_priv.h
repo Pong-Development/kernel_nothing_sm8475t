@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -105,6 +105,10 @@
 
 #ifdef WLAN_FEATURE_COAP
 #include "wlan_coap_public_structs.h"
+#endif
+
+#ifdef FEATURE_SAR_LIMITS
+#include <wma_sar_public_structs.h>
 #endif
 
 #define WMI_UNIFIED_MAX_EVENT 0x100
@@ -2128,6 +2132,11 @@ QDF_STATUS (*extract_sar_cap_service_ready_ext)(
 		uint8_t *evt_buf,
 		struct wlan_psoc_host_service_ext_param *ext_param);
 
+QDF_STATUS (*extract_sar_cap_service_ready_ext2)(
+		wmi_unified_t wmi_handle,
+		uint8_t *evt_buf,
+		struct wlan_psoc_host_service_ext2_param *ext2_param);
+
 #ifdef WLAN_SUPPORT_TWT
 QDF_STATUS (*extract_twt_cap_service_ready_ext2)(
 		wmi_unified_t wmi_handle,
@@ -2929,6 +2938,12 @@ QDF_STATUS
 
 QDF_STATUS (*extract_coap_buf_info)(wmi_unified_t wmi_handle, void *evt_buf,
 				    struct coap_buf_info *info);
+#endif
+
+#ifdef WLAN_FEATURE_PEER_TXQ_FLUSH_CONF
+QDF_STATUS
+(*send_peer_txq_flush_config_cmd)(wmi_unified_t wmi_handle,
+				  struct peer_txq_flush_config_params *param);
 #endif
 };
 
